@@ -38,19 +38,21 @@ cmake --build build -j
 ./build/osm_drive
 ```
 
-## Getting real OSM data
+## Getting real Greenwood OSM data
 
-A tiny sample map is included at `assets/maps/greenwood_sample.osm`. For a larger local extract:
-
-1. Go to <https://www.openstreetmap.org/export>
-2. Select a bounding box around Greenwood, AR.
-3. Export OpenStreetMap XML.
-4. Save it as `assets/maps/greenwood.osm`.
-5. Run:
+A tiny synthetic sample is included at `assets/maps/greenwood_sample.osm`. Fetch a
+real Greenwood, Arkansas extract (roads plus future environment layers) with:
 
 ```bash
-./build/osm_drive assets/maps/greenwood.osm
+python3 tools/fetch_osm_greenwood.py
+./build/osm_drive --validate-map assets/maps/generated/greenwood.osm
+./build/osm_drive assets/maps/generated/greenwood.osm
 ```
+
+The generated map and per-download attribution metadata are ignored by Git to
+avoid committing a large, frequently changing database extract. The fetch tool,
+exact bounding box/query, data provenance, and reuse obligations are documented
+in [`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md).
 
 ## Roadmap
 
@@ -61,5 +63,9 @@ See:
 
 ## License notes
 
-- OpenStreetMap data is © OpenStreetMap contributors and licensed under ODbL.
-- Do not commit proprietary Street View imagery. Use only data whose license permits game/runtime usage.
+- OpenStreetMap data is © OpenStreetMap contributors and licensed under the
+  [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/). See
+  [`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md) for source URLs, retrieval
+  metadata, and the current inventory of included data.
+- Google Street View assets are not used. Do not scrape or commit its imagery or
+  geometry; use only sources whose licenses permit the intended game/runtime use.

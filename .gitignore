@@ -1,6 +1,8 @@
 build/
 .vscode/
 .cache/
+__pycache__/
+*.py[cod]
 *.user
 *.o
 *.a
@@ -9,4 +11,5 @@ build/
 *.exe
 .DS_Store
 assets/maps/*.osm
+assets/maps/generated/
 !assets/maps/greenwood_sample.osm

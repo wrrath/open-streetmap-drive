@@ -1,6 +1,7 @@
 #include "game/Game.hpp"
 #include "core/Log.hpp"
 #include "core/Timer.hpp"
+#include "environment/Terrain.hpp"
 #include "map/OsmLoader.hpp"
 #include <GLFW/glfw3.h>
 #include <algorithm>
@@ -17,6 +18,8 @@ Game::Game(std::filesystem::path mapPath) {
     message << "Generated road mesh: " << roadMesh_.vertices.size() << " vertices, "
             << roadMesh_.indices.size() << " indices";
     core::log(core::LogLevel::Info, message.str());
+    environment::ProceduralRuralSource terrainSource;
+    renderer_.setTerrainMesh(environment::buildTerrainMesh({}, terrainSource));
     renderer_.setRoadMesh(roadMesh_);
 }
 

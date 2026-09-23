@@ -72,11 +72,16 @@ VulkanRenderer::~VulkanRenderer() {
         if (inFlightFence_ != VK_NULL_HANDLE) vkDestroyFence(device_, inFlightFence_, nullptr);
         if (renderFinishedSemaphore_ != VK_NULL_HANDLE) vkDestroySemaphore(device_, renderFinishedSemaphore_, nullptr);
         if (imageAvailableSemaphore_ != VK_NULL_HANDLE) vkDestroySemaphore(device_, imageAvailableSemaphore_, nullptr);
+        if (terrainIndexBuffer_ != VK_NULL_HANDLE) vkDestroyBuffer(device_, terrainIndexBuffer_, nullptr);
+        if (terrainIndexMemory_ != VK_NULL_HANDLE) vkFreeMemory(device_, terrainIndexMemory_, nullptr);
+        if (terrainVertexBuffer_ != VK_NULL_HANDLE) vkDestroyBuffer(device_, terrainVertexBuffer_, nullptr);
+        if (terrainVertexMemory_ != VK_NULL_HANDLE) vkFreeMemory(device_, terrainVertexMemory_, nullptr);
         if (roadIndexBuffer_ != VK_NULL_HANDLE) vkDestroyBuffer(device_, roadIndexBuffer_, nullptr);
         if (roadIndexMemory_ != VK_NULL_HANDLE) vkFreeMemory(device_, roadIndexMemory_, nullptr);
         if (roadVertexBuffer_ != VK_NULL_HANDLE) vkDestroyBuffer(device_, roadVertexBuffer_, nullptr);
         if (roadVertexMemory_ != VK_NULL_HANDLE) vkFreeMemory(device_, roadVertexMemory_, nullptr);
         cleanupSwapchain();
+        if (terrainPipeline_ != VK_NULL_HANDLE) vkDestroyPipeline(device_, terrainPipeline_, nullptr);
         if (roadPipeline_ != VK_NULL_HANDLE) vkDestroyPipeline(device_, roadPipeline_, nullptr);
         if (pipelineLayout_ != VK_NULL_HANDLE) vkDestroyPipelineLayout(device_, pipelineLayout_, nullptr);
         if (commandPool_ != VK_NULL_HANDLE) vkDestroyCommandPool(device_, commandPool_, nullptr);
@@ -112,6 +117,28 @@ void VulkanRenderer::setRoadMesh(const map::RoadMesh& mesh) {
     vkUnmapMemory(device_, roadIndexMemory_);
 
     core::log(core::LogLevel::Info, "Uploaded road mesh to Vulkan vertex/index buffers");
+}
+
+void VulkanRenderer::setTerrainMesh(const map::RoadMesh& mesh) {
+    terrainIndexCount_ = static_cast<std::uint32_t>(mesh.indices.size());
+    if (mesh.vertices.empty() || mesh.indices.empty()) return;
+
+    const VkDeviceSize vertexBytes = sizeof(map::RoadVertex) * mesh.vertices.size();
+    const VkDeviceSize indexBytes = sizeof(std::uint32_t) * mesh.indices.size();
+    createBuffer(vertexBytes, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 terrainVertexBuffer_, terrainVertexMemory_);
+    void* data = nullptr;
+    vkMapMemory(device_, terrainVertexMemory_, 0, vertexBytes, 0, &data);
+    std::memcpy(data, mesh.vertices.data(), static_cast<std::size_t>(vertexBytes));
+    vkUnmapMemory(device_, terrainVertexMemory_);
+    createBuffer(indexBytes, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 terrainIndexBuffer_, terrainIndexMemory_);
+    vkMapMemory(device_, terrainIndexMemory_, 0, indexBytes, 0, &data);
+    std::memcpy(data, mesh.indices.data(), static_cast<std::size_t>(indexBytes));
+    vkUnmapMemory(device_, terrainIndexMemory_);
+    core::log(core::LogLevel::Info, "Uploaded terrain grid to Vulkan vertex/index buffers");
 }
 
 void VulkanRenderer::setFollowCamera(glm::vec3 vehiclePosition, float vehicleHeadingRadians) {
@@ -388,6 +415,16 @@ void VulkanRenderer::createGraphicsPipeline() {
     pipelineInfo.renderPass = renderPass_;
     if (vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &roadPipeline_) != VK_SUCCESS) throw std::runtime_error("Failed to create road graphics pipeline");
     vkDestroyShaderModule(device_, frag, nullptr);
+
+    const auto terrainFragPath = shaderDir / "terrain.frag.spv";
+    if (std::filesystem::exists(terrainFragPath)) {
+        VkShaderModule terrainFrag = loadShaderModule(terrainFragPath);
+        stages[1].module = terrainFrag;
+        if (vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &terrainPipeline_) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create terrain graphics pipeline");
+        }
+        vkDestroyShaderModule(device_, terrainFrag, nullptr);
+    }
     vkDestroyShaderModule(device_, vert, nullptr);
 }
 
@@ -450,8 +487,15 @@ void VulkanRenderer::recordCommandBuffer(std::uint32_t imageIndex) {
     renderPassInfo.clearValueCount = 1;
     renderPassInfo.pClearValues = &clearColor;
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    const VkDeviceSize offset = 0;
+    if (terrainPipeline_ != VK_NULL_HANDLE && terrainVertexBuffer_ != VK_NULL_HANDLE && terrainIndexBuffer_ != VK_NULL_HANDLE && terrainIndexCount_ > 0) {
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, terrainPipeline_);
+        vkCmdPushConstants(commandBuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants), &push);
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &terrainVertexBuffer_, &offset);
+        vkCmdBindIndexBuffer(commandBuffer, terrainIndexBuffer_, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdDrawIndexed(commandBuffer, terrainIndexCount_, 1, 0, 0, 0);
+    }
     if (roadPipeline_ != VK_NULL_HANDLE && roadVertexBuffer_ != VK_NULL_HANDLE && roadIndexBuffer_ != VK_NULL_HANDLE && roadIndexCount_ > 0) {
-        const VkDeviceSize offset = 0;
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, roadPipeline_);
         vkCmdPushConstants(commandBuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants), &push);
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, &roadVertexBuffer_, &offset);

@@ -38,6 +38,8 @@ void Game::run() {
         }
 
         renderer_.setVehicleTransform(player_.position(), player_.headingRadians());
+        renderer_.setVehicleTelemetry({player_.speedMetersPerSecond(), player_.rpm(), player_.gear(),
+                                       player_.throttle(), player_.brake()});
         renderer_.drawFrame();
     }
 }

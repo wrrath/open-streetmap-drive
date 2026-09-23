@@ -50,9 +50,37 @@ FetchContent_MakeAvailable(glfw glm tinyxml2)
 
 file(GLOB_RECURSE OSM_DRIVE_SOURCES CONFIGURE_DEPENDS src/*.cpp src/*.hpp)
 
+find_program(GLSLC_EXECUTABLE glslc)
+set(OSM_DRIVE_SHADER_OUTPUT_DIR "${CMAKE_BINARY_DIR}/shaders")
+if(GLSLC_EXECUTABLE)
+  file(MAKE_DIRECTORY "${OSM_DRIVE_SHADER_OUTPUT_DIR}")
+  set(OSM_DRIVE_SHADER_SPV
+    "${OSM_DRIVE_SHADER_OUTPUT_DIR}/road.vert.spv"
+    "${OSM_DRIVE_SHADER_OUTPUT_DIR}/road.frag.spv"
+  )
+  add_custom_command(
+    OUTPUT "${OSM_DRIVE_SHADER_OUTPUT_DIR}/road.vert.spv"
+    COMMAND ${GLSLC_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/road.vert" -o "${OSM_DRIVE_SHADER_OUTPUT_DIR}/road.vert.spv"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/road.vert"
+    VERBATIM
+  )
+  add_custom_command(
+    OUTPUT "${OSM_DRIVE_SHADER_OUTPUT_DIR}/road.frag.spv"
+    COMMAND ${GLSLC_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/road.frag" -o "${OSM_DRIVE_SHADER_OUTPUT_DIR}/road.frag.spv"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/road.frag"
+    VERBATIM
+  )
+  add_custom_target(osm_drive_shaders DEPENDS ${OSM_DRIVE_SHADER_SPV})
+else()
+  message(WARNING "glslc not found; building without compiled road shaders. Install glslang-tools or Vulkan SDK shader tools for mesh rendering.")
+endif()
+
 add_executable(osm_drive ${OSM_DRIVE_SOURCES})
 target_include_directories(osm_drive BEFORE PRIVATE src "${OSM_DRIVE_VULKAN_HEADER_SHIM}")
 target_link_libraries(osm_drive PRIVATE Vulkan::Vulkan glfw glm::glm tinyxml2)
+if(TARGET osm_drive_shaders)
+  add_dependencies(osm_drive osm_drive_shaders)
+endif()
 
 target_compile_options(osm_drive PRIVATE
   $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic -Wconversion>
@@ -61,4 +89,5 @@ target_compile_options(osm_drive PRIVATE
 
 target_compile_definitions(osm_drive PRIVATE
   OSM_DRIVE_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets"
+  OSM_DRIVE_SHADER_DIR="${OSM_DRIVE_SHADER_OUTPUT_DIR}"
 )

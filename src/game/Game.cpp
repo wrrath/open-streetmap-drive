@@ -17,6 +17,7 @@ Game::Game(std::filesystem::path mapPath) {
     message << "Generated road mesh: " << roadMesh_.vertices.size() << " vertices, "
             << roadMesh_.indices.size() << " indices";
     core::log(core::LogLevel::Info, message.str());
+    renderer_.setRoadMesh(roadMesh_);
 }
 
 void Game::run() {

@@ -14,6 +14,7 @@ A Vulkan/C++ racing-game prototype that turns real rural road data into a drivab
 This repository provides a clean C++20/Vulkan foundation:
 
 - GLFW window and Vulkan instance/device/swapchain setup.
+- Road mesh upload to Vulkan vertex/index buffers and rendering through a simple graphics pipeline when `glslc` is available at CMake configure time.
 - Game loop with fixed timestep physics.
 - OSM XML loader for highways around Greenwood, AR.
 - Coordinate conversion from latitude/longitude to local meters.
@@ -23,9 +24,10 @@ This repository provides a clean C++20/Vulkan foundation:
 
 ## Requirements
 
-- CMake 3.24+
+- CMake 3.22+
 - C++20 compiler
-- Vulkan SDK (`VULKAN_SDK` configured, `glslc` optional for future shaders)
+- Vulkan SDK (`VULKAN_SDK` configured)
+- `glslc` for road mesh shaders (`sudo apt install glslang-tools` on Ubuntu/WSL)
 - Linux packages commonly needed: `libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev`
 
 ## Build

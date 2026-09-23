@@ -9,6 +9,20 @@ include(FetchContent)
 
 find_package(Vulkan REQUIRED)
 
+# Some development machines have stale Vulkan headers in /usr/local/include that
+# shadow distro headers. Put a generated header shim first when system headers
+# are available so builds remain reproducible without modifying the machine.
+set(OSM_DRIVE_VULKAN_HEADER_SHIM "${CMAKE_BINARY_DIR}/generated_vulkan_headers")
+if(EXISTS "/usr/include/vulkan/vulkan.h")
+  file(MAKE_DIRECTORY "${OSM_DRIVE_VULKAN_HEADER_SHIM}")
+  if(NOT EXISTS "${OSM_DRIVE_VULKAN_HEADER_SHIM}/vulkan")
+    file(CREATE_LINK "/usr/include/vulkan" "${OSM_DRIVE_VULKAN_HEADER_SHIM}/vulkan" SYMBOLIC)
+  endif()
+  if(EXISTS "/usr/include/vk_video" AND NOT EXISTS "${OSM_DRIVE_VULKAN_HEADER_SHIM}/vk_video")
+    file(CREATE_LINK "/usr/include/vk_video" "${OSM_DRIVE_VULKAN_HEADER_SHIM}/vk_video" SYMBOLIC)
+  endif()
+endif()
+
 FetchContent_Declare(
   glfw
   GIT_REPOSITORY https://github.com/glfw/glfw.git
@@ -17,6 +31,8 @@ FetchContent_Declare(
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_X11 OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_WAYLAND ON CACHE BOOL "" FORCE)
 
 FetchContent_Declare(
   glm
@@ -35,7 +51,7 @@ FetchContent_MakeAvailable(glfw glm tinyxml2)
 file(GLOB_RECURSE OSM_DRIVE_SOURCES CONFIGURE_DEPENDS src/*.cpp src/*.hpp)
 
 add_executable(osm_drive ${OSM_DRIVE_SOURCES})
-target_include_directories(osm_drive PRIVATE src)
+target_include_directories(osm_drive BEFORE PRIVATE src "${OSM_DRIVE_VULKAN_HEADER_SHIM}")
 target_link_libraries(osm_drive PRIVATE Vulkan::Vulkan glfw glm::glm tinyxml2)
 
 target_compile_options(osm_drive PRIVATE

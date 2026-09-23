@@ -1,20 +1,21 @@
 #pragma once
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
+#include <cstdint>
 #include <string>
 #include <vector>
 
 namespace osm_drive::map {
 
 struct RoadNode {
-    long long id = 0;
+    std::int64_t id = 0;
     double latitude = 0.0;
     double longitude = 0.0;
     glm::vec2 meters {0.0f, 0.0f};
 };
 
 struct RoadWay {
-    long long id = 0;
+    std::int64_t id = 0;
     std::string name;
     std::string highwayClass;
     float widthMeters = 6.0f;

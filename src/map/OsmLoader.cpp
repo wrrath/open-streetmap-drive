@@ -2,6 +2,7 @@
 #include "core/Log.hpp"
 #include <tinyxml2.h>
 #include <cmath>
+#include <cstdint>
 #include <charconv>
 #include <optional>
 #include <string_view>
@@ -83,7 +84,7 @@ RoadNetwork OsmLoader::load(const std::filesystem::path& path) const {
         roadWay.widthMeters = roadWidth(roadWay.highwayClass);
 
         for (const auto* nd = way->FirstChildElement("nd"); nd != nullptr; nd = nd->NextSiblingElement("nd")) {
-            long long ref = 0;
+            std::int64_t ref = 0;
             nd->QueryInt64Attribute("ref", &ref);
             if (const auto it = nodes.find(ref); it != nodes.end()) {
                 roadWay.nodes.push_back(it->second);

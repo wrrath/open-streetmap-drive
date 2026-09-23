@@ -20,6 +20,7 @@ This repository provides a clean C++20/Vulkan foundation:
 - Coordinate conversion from latitude/longitude to local meters.
 - Road graph and simple road mesh generation.
 - Basic vehicle controller/physics scaffolding.
+- Texture-free racing HUD showing mph, km/h, simulated RPM, and automatic gear.
 - Expandable renderer, world, map, and physics modules.
 
 ## Requirements
@@ -37,6 +38,12 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build -j
 ./build/osm_drive
 ```
+
+## HUD
+
+The upper-left HUD receives a renderer-neutral `game::VehicleTelemetry` snapshot each frame. The placeholder five-speed automatic gearbox derives gear and RPM from road speed and throttle. Text uses a tiny built-in 5x7 bitmap alphabet: each lit cell is emitted as two colored triangles, avoiding font files, texture uploads, and descriptor sets.
+
+The HUD has its own Vulkan graphics pipeline (`hud.vert`/`hud.frag`) but draws in the existing render pass after the road. Its host-visible vertex buffer is rewritten with clip-space glyph geometry before each draw. This deliberately simple path is suitable for replacing with a textured font atlas later without coupling UI presentation to vehicle physics.
 
 ## Getting real OSM data
 

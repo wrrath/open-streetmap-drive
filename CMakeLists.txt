@@ -56,6 +56,8 @@ set(OSM_DRIVE_SHADER_OUTPUT_DIR "${CMAKE_BINARY_DIR}/shaders")
 set(OSM_DRIVE_SHADER_SPV
   "${OSM_DRIVE_SHADER_OUTPUT_DIR}/road.vert.spv"
   "${OSM_DRIVE_SHADER_OUTPUT_DIR}/road.frag.spv"
+  "${OSM_DRIVE_SHADER_OUTPUT_DIR}/hud.vert.spv"
+  "${OSM_DRIVE_SHADER_OUTPUT_DIR}/hud.frag.spv"
 )
 if(GLSLC_EXECUTABLE OR GLSLANG_VALIDATOR_EXECUTABLE)
   file(MAKE_DIRECTORY "${OSM_DRIVE_SHADER_OUTPUT_DIR}")
@@ -80,6 +82,14 @@ if(GLSLC_EXECUTABLE OR GLSLANG_VALIDATOR_EXECUTABLE)
     DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/road.frag"
     VERBATIM
   )
+  foreach(HUD_STAGE vert frag)
+    add_custom_command(
+      OUTPUT "${OSM_DRIVE_SHADER_OUTPUT_DIR}/hud.${HUD_STAGE}.spv"
+      COMMAND ${OSM_DRIVE_SHADER_COMPILER} ${OSM_DRIVE_SHADER_COMPILER_ARGS} "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/hud.${HUD_STAGE}" -o "${OSM_DRIVE_SHADER_OUTPUT_DIR}/hud.${HUD_STAGE}.spv"
+      DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/hud.${HUD_STAGE}"
+      VERBATIM
+    )
+  endforeach()
   add_custom_target(osm_drive_shaders DEPENDS ${OSM_DRIVE_SHADER_SPV})
 else()
   message(WARNING "No GLSL-to-SPIR-V compiler found; building without compiled road shaders. Install glslc, glslang-tools, or Vulkan SDK shader tools for mesh rendering.")

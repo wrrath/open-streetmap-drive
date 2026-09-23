@@ -7,6 +7,7 @@
 #include <array>
 #include <cmath>
 #include <cstring>
+#include <cstdio>
 #include <fstream>
 #include <limits>
 #include <stdexcept>
@@ -17,6 +18,56 @@ namespace {
 constexpr std::array<const char*, 1> DeviceExtensions {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
 struct PushConstants { glm::mat4 mvp; };
+struct HudVertex { glm::vec2 position; glm::vec3 color; };
+constexpr VkDeviceSize HudBufferBytes = sizeof(HudVertex) * 12000;
+
+// Tiny 5x7 bitmap alphabet: no textures, descriptors, or font dependency.
+// Each lit cell becomes two triangles in clip space.
+std::array<const char*, 7> glyph(char c) {
+    switch (c) {
+    case '0': return {"11111","10001","10011","10101","11001","10001","11111"};
+    case '1': return {"00100","01100","00100","00100","00100","00100","01110"};
+    case '2': return {"11110","00001","00001","11110","10000","10000","11111"};
+    case '3': return {"11110","00001","00001","01110","00001","00001","11110"};
+    case '4': return {"10010","10010","10010","11111","00010","00010","00010"};
+    case '5': return {"11111","10000","10000","11110","00001","00001","11110"};
+    case '6': return {"01111","10000","10000","11110","10001","10001","01110"};
+    case '7': return {"11111","00001","00010","00100","01000","01000","01000"};
+    case '8': return {"01110","10001","10001","01110","10001","10001","01110"};
+    case '9': return {"01110","10001","10001","01111","00001","00001","11110"};
+    case 'A': return {"01110","10001","10001","11111","10001","10001","10001"};
+    case 'D': return {"11110","10001","10001","10001","10001","10001","11110"};
+    case 'E': return {"11111","10000","10000","11110","10000","10000","11111"};
+    case 'G': return {"01111","10000","10000","10111","10001","10001","01110"};
+    case 'H': return {"10001","10001","10001","11111","10001","10001","10001"};
+    case 'K': return {"10001","10010","10100","11000","10100","10010","10001"};
+    case 'M': return {"10001","11011","10101","10101","10001","10001","10001"};
+    case 'P': return {"11110","10001","10001","11110","10000","10000","10000"};
+    case 'R': return {"11110","10001","10001","11110","10100","10010","10001"};
+    case 'S': return {"01111","10000","10000","01110","00001","00001","11110"};
+    case 'V': return {"10001","10001","10001","10001","10001","01010","00100"};
+    default: return {"00000","00000","00000","00000","00000","00000","00000"};
+    }
+}
+
+void addHudText(std::vector<HudVertex>& vertices, const std::string& text, float x, float y,
+                float pixel, glm::vec3 color, VkExtent2D extent) {
+    const float sx = 2.0f / static_cast<float>(extent.width);
+    const float sy = 2.0f / static_cast<float>(extent.height);
+    for (char c : text) {
+        const auto rows = glyph(c);
+        for (int row = 0; row < 7; ++row) for (int col = 0; col < 5; ++col) {
+            if (rows[static_cast<std::size_t>(row)][col] != '1') continue;
+            const float left = -1.0f + (x + static_cast<float>(col) * pixel) * sx;
+            const float right = -1.0f + (x + static_cast<float>(col + 1) * pixel - 1.0f) * sx;
+            const float top = 1.0f - (y + static_cast<float>(row) * pixel) * sy;
+            const float bottom = 1.0f - (y + static_cast<float>(row + 1) * pixel - 1.0f) * sy;
+            vertices.insert(vertices.end(), {{{left, top}, color}, {{left, bottom}, color}, {{right, bottom}, color},
+                                             {{left, top}, color}, {{right, bottom}, color}, {{right, top}, color}});
+        }
+        x += pixel * 6.0f;
+    }
+}
 
 std::vector<char> readBinaryFile(const std::filesystem::path& path) {
     std::ifstream file(path, std::ios::ate | std::ios::binary);
@@ -60,6 +111,9 @@ VulkanRenderer::VulkanRenderer(int width, int height, const char* title) {
     createImageViews();
     createRenderPass();
     createGraphicsPipeline();
+    createBuffer(HudBufferBytes, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 hudVertexBuffer_, hudVertexMemory_);
     createFramebuffers();
     createCommandPool();
     createCommandBuffers();
@@ -72,11 +126,15 @@ VulkanRenderer::~VulkanRenderer() {
         if (inFlightFence_ != VK_NULL_HANDLE) vkDestroyFence(device_, inFlightFence_, nullptr);
         if (renderFinishedSemaphore_ != VK_NULL_HANDLE) vkDestroySemaphore(device_, renderFinishedSemaphore_, nullptr);
         if (imageAvailableSemaphore_ != VK_NULL_HANDLE) vkDestroySemaphore(device_, imageAvailableSemaphore_, nullptr);
+        if (hudVertexBuffer_ != VK_NULL_HANDLE) vkDestroyBuffer(device_, hudVertexBuffer_, nullptr);
+        if (hudVertexMemory_ != VK_NULL_HANDLE) vkFreeMemory(device_, hudVertexMemory_, nullptr);
         if (roadIndexBuffer_ != VK_NULL_HANDLE) vkDestroyBuffer(device_, roadIndexBuffer_, nullptr);
         if (roadIndexMemory_ != VK_NULL_HANDLE) vkFreeMemory(device_, roadIndexMemory_, nullptr);
         if (roadVertexBuffer_ != VK_NULL_HANDLE) vkDestroyBuffer(device_, roadVertexBuffer_, nullptr);
         if (roadVertexMemory_ != VK_NULL_HANDLE) vkFreeMemory(device_, roadVertexMemory_, nullptr);
         cleanupSwapchain();
+        if (hudPipeline_ != VK_NULL_HANDLE) vkDestroyPipeline(device_, hudPipeline_, nullptr);
+        if (hudPipelineLayout_ != VK_NULL_HANDLE) vkDestroyPipelineLayout(device_, hudPipelineLayout_, nullptr);
         if (roadPipeline_ != VK_NULL_HANDLE) vkDestroyPipeline(device_, roadPipeline_, nullptr);
         if (pipelineLayout_ != VK_NULL_HANDLE) vkDestroyPipelineLayout(device_, pipelineLayout_, nullptr);
         if (commandPool_ != VK_NULL_HANDLE) vkDestroyCommandPool(device_, commandPool_, nullptr);
@@ -389,6 +447,28 @@ void VulkanRenderer::createGraphicsPipeline() {
     if (vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &roadPipeline_) != VK_SUCCESS) throw std::runtime_error("Failed to create road graphics pipeline");
     vkDestroyShaderModule(device_, frag, nullptr);
     vkDestroyShaderModule(device_, vert, nullptr);
+
+    // HUD is a second pipeline in the same render pass. Its vertices are
+    // already in clip space, so it needs no uniforms or descriptor sets.
+    vert = loadShaderModule(shaderDir / "hud.vert.spv");
+    frag = loadShaderModule(shaderDir / "hud.frag.spv");
+    stages[0].module = vert;
+    stages[1].module = frag;
+    binding.stride = sizeof(HudVertex);
+    std::array<VkVertexInputAttributeDescription, 2> hudAttributes {};
+    hudAttributes[0] = {0, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(HudVertex, position)};
+    hudAttributes[1] = {1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(HudVertex, color)};
+    vertexInput.vertexAttributeDescriptionCount = static_cast<std::uint32_t>(hudAttributes.size());
+    vertexInput.pVertexAttributeDescriptions = hudAttributes.data();
+    VkPipelineLayoutCreateInfo hudLayoutInfo {};
+    hudLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    if (vkCreatePipelineLayout(device_, &hudLayoutInfo, nullptr, &hudPipelineLayout_) != VK_SUCCESS)
+        throw std::runtime_error("Failed to create HUD pipeline layout");
+    pipelineInfo.layout = hudPipelineLayout_;
+    if (vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &hudPipeline_) != VK_SUCCESS)
+        throw std::runtime_error("Failed to create HUD graphics pipeline");
+    vkDestroyShaderModule(device_, frag, nullptr);
+    vkDestroyShaderModule(device_, vert, nullptr);
 }
 
 void VulkanRenderer::createFramebuffers() {
@@ -457,6 +537,33 @@ void VulkanRenderer::recordCommandBuffer(std::uint32_t imageIndex) {
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, &roadVertexBuffer_, &offset);
         vkCmdBindIndexBuffer(commandBuffer, roadIndexBuffer_, 0, VK_INDEX_TYPE_UINT32);
         vkCmdDrawIndexed(commandBuffer, roadIndexCount_, 1, 0, 0, 0);
+    }
+    if (hudPipeline_ != VK_NULL_HANDLE && hudVertexBuffer_ != VK_NULL_HANDLE) {
+        std::vector<HudVertex> hudVertices;
+        hudVertices.reserve(6000);
+        char text[64] {};
+        const int mph = static_cast<int>(std::round(telemetry_.speedMetersPerSecond * 2.23694f));
+        const int kmh = static_cast<int>(std::round(telemetry_.speedMetersPerSecond * 3.6f));
+        std::snprintf(text, sizeof(text), "SPEED %03d MPH", mph);
+        addHudText(hudVertices, text, 34.0f, 34.0f, 4.0f, {1.0f, 1.0f, 1.0f}, swapchainExtent_);
+        std::snprintf(text, sizeof(text), "%03d KMH", kmh);
+        addHudText(hudVertices, text, 178.0f, 70.0f, 3.0f, {0.72f, 0.88f, 1.0f}, swapchainExtent_);
+        std::snprintf(text, sizeof(text), "RPM %04d", static_cast<int>(std::round(telemetry_.rpm)));
+        addHudText(hudVertices, text, 34.0f, 102.0f, 3.0f,
+                   telemetry_.rpm > 6000.0f ? glm::vec3{1.0f, 0.25f, 0.2f} : glm::vec3{1.0f, 0.75f, 0.18f}, swapchainExtent_);
+        std::snprintf(text, sizeof(text), "GEAR %d", telemetry_.gear);
+        addHudText(hudVertices, text, 34.0f, 132.0f, 3.0f, {0.55f, 1.0f, 0.55f}, swapchainExtent_);
+        const VkDeviceSize bytes = sizeof(HudVertex) * hudVertices.size();
+        if (bytes <= HudBufferBytes) {
+            void* mapped = nullptr;
+            vkMapMemory(device_, hudVertexMemory_, 0, bytes, 0, &mapped);
+            std::memcpy(mapped, hudVertices.data(), static_cast<std::size_t>(bytes));
+            vkUnmapMemory(device_, hudVertexMemory_);
+            const VkDeviceSize offset = 0;
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, hudPipeline_);
+            vkCmdBindVertexBuffers(commandBuffer, 0, 1, &hudVertexBuffer_, &offset);
+            vkCmdDraw(commandBuffer, static_cast<std::uint32_t>(hudVertices.size()), 1, 0, 0);
+        }
     }
     vkCmdEndRenderPass(commandBuffer);
     if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) throw std::runtime_error("Failed to record command buffer");

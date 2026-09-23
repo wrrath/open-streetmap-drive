@@ -6,6 +6,7 @@
 #include <glm/vec3.hpp>
 #include <string>
 #include <vector>
+#include "game/VehicleTelemetry.hpp"
 
 namespace osm_drive::map { struct RoadMesh; }
 
@@ -24,6 +25,7 @@ public:
     void drawFrame();
     void setRoadMesh(const map::RoadMesh& mesh);
     void setFollowCamera(glm::vec3 vehiclePosition, float vehicleHeadingRadians);
+    void setVehicleTelemetry(const game::VehicleTelemetry& telemetry) { telemetry_ = telemetry; }
     [[nodiscard]] GLFWwindow* window() const { return window_; }
 
 private:
@@ -63,6 +65,8 @@ private:
     VkRenderPass renderPass_ = VK_NULL_HANDLE;
     VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
     VkPipeline roadPipeline_ = VK_NULL_HANDLE;
+    VkPipeline hudPipeline_ = VK_NULL_HANDLE;
+    VkPipelineLayout hudPipelineLayout_ = VK_NULL_HANDLE;
     std::vector<VkFramebuffer> framebuffers_;
     VkCommandPool commandPool_ = VK_NULL_HANDLE;
     std::vector<VkCommandBuffer> commandBuffers_;
@@ -72,6 +76,10 @@ private:
     VkBuffer roadIndexBuffer_ = VK_NULL_HANDLE;
     VkDeviceMemory roadIndexMemory_ = VK_NULL_HANDLE;
     std::uint32_t roadIndexCount_ = 0;
+
+    VkBuffer hudVertexBuffer_ = VK_NULL_HANDLE;
+    VkDeviceMemory hudVertexMemory_ = VK_NULL_HANDLE;
+    game::VehicleTelemetry telemetry_ {};
 
     glm::vec3 cameraVehiclePosition_ {0.0f, 0.35f, 0.0f};
     float cameraVehicleHeadingRadians_ = 0.0f;

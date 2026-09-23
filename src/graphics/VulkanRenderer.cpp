@@ -5,6 +5,7 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstring>
 #include <fstream>
 #include <limits>
@@ -110,8 +111,12 @@ void VulkanRenderer::setRoadMesh(const map::RoadMesh& mesh) {
     std::memcpy(data, mesh.indices.data(), static_cast<std::size_t>(indexBytes));
     vkUnmapMemory(device_, roadIndexMemory_);
 
-    recordCommandBuffers();
     core::log(core::LogLevel::Info, "Uploaded road mesh to Vulkan vertex/index buffers");
+}
+
+void VulkanRenderer::setFollowCamera(glm::vec3 vehiclePosition, float vehicleHeadingRadians) {
+    cameraVehiclePosition_ = vehiclePosition;
+    cameraVehicleHeadingRadians_ = vehicleHeadingRadians;
 }
 
 void VulkanRenderer::drawFrame() {
@@ -121,6 +126,8 @@ void VulkanRenderer::drawFrame() {
     std::uint32_t imageIndex = 0;
     const VkResult acquireResult = vkAcquireNextImageKHR(device_, swapchain_, UINT64_MAX, imageAvailableSemaphore_, VK_NULL_HANDLE, &imageIndex);
     if (acquireResult != VK_SUCCESS && acquireResult != VK_SUBOPTIMAL_KHR) throw std::runtime_error("Failed to acquire swapchain image");
+
+    recordCommandBuffer(imageIndex);
 
     const VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     VkSubmitInfo submitInfo {};
@@ -416,41 +423,43 @@ void VulkanRenderer::createCommandBuffers() {
     allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocateInfo.commandBufferCount = static_cast<std::uint32_t>(commandBuffers_.size());
     if (vkAllocateCommandBuffers(device_, &allocateInfo, commandBuffers_.data()) != VK_SUCCESS) throw std::runtime_error("Failed to allocate command buffers");
-    recordCommandBuffers();
 }
 
-void VulkanRenderer::recordCommandBuffers() {
+void VulkanRenderer::recordCommandBuffer(std::uint32_t imageIndex) {
     const float aspect = static_cast<float>(swapchainExtent_.width) / static_cast<float>(swapchainExtent_.height);
-    glm::mat4 projection = glm::ortho(-950.0f * aspect, 950.0f * aspect, -950.0f, 950.0f, -50.0f, 50.0f);
+    glm::mat4 projection = glm::perspective(glm::radians(62.0f), aspect, 0.1f, 2500.0f);
     projection[1][1] *= -1.0f;
-    const glm::mat4 view = glm::lookAt(glm::vec3(350.0f, 1.0f, 350.0f), glm::vec3(350.0f, 0.0f, 350.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+
+    const glm::vec3 forward {std::sin(cameraVehicleHeadingRadians_), 0.0f, std::cos(cameraVehicleHeadingRadians_)};
+    const glm::vec3 cameraPosition = cameraVehiclePosition_ - forward * 22.0f + glm::vec3(0.0f, 10.0f, 0.0f);
+    const glm::vec3 lookAt = cameraVehiclePosition_ + forward * 18.0f + glm::vec3(0.0f, 1.5f, 0.0f);
+    const glm::mat4 view = glm::lookAt(cameraPosition, lookAt, glm::vec3(0.0f, 1.0f, 0.0f));
     const PushConstants push {projection * view};
 
-    for (std::size_t i = 0; i < commandBuffers_.size(); ++i) {
-        vkResetCommandBuffer(commandBuffers_[i], 0);
-        VkCommandBufferBeginInfo beginInfo {};
-        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        vkBeginCommandBuffer(commandBuffers_[i], &beginInfo);
-        VkClearValue clearColor {{{0.03f, 0.12f, 0.08f, 1.0f}}};
-        VkRenderPassBeginInfo renderPassInfo {};
-        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.renderPass = renderPass_;
-        renderPassInfo.framebuffer = framebuffers_[i];
-        renderPassInfo.renderArea.extent = swapchainExtent_;
-        renderPassInfo.clearValueCount = 1;
-        renderPassInfo.pClearValues = &clearColor;
-        vkCmdBeginRenderPass(commandBuffers_[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-        if (roadPipeline_ != VK_NULL_HANDLE && roadVertexBuffer_ != VK_NULL_HANDLE && roadIndexBuffer_ != VK_NULL_HANDLE && roadIndexCount_ > 0) {
-            const VkDeviceSize offset = 0;
-            vkCmdBindPipeline(commandBuffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, roadPipeline_);
-            vkCmdPushConstants(commandBuffers_[i], pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants), &push);
-            vkCmdBindVertexBuffers(commandBuffers_[i], 0, 1, &roadVertexBuffer_, &offset);
-            vkCmdBindIndexBuffer(commandBuffers_[i], roadIndexBuffer_, 0, VK_INDEX_TYPE_UINT32);
-            vkCmdDrawIndexed(commandBuffers_[i], roadIndexCount_, 1, 0, 0, 0);
-        }
-        vkCmdEndRenderPass(commandBuffers_[i]);
-        if (vkEndCommandBuffer(commandBuffers_[i]) != VK_SUCCESS) throw std::runtime_error("Failed to record command buffer");
+    VkCommandBuffer commandBuffer = commandBuffers_[imageIndex];
+    vkResetCommandBuffer(commandBuffer, 0);
+    VkCommandBufferBeginInfo beginInfo {};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    vkBeginCommandBuffer(commandBuffer, &beginInfo);
+    VkClearValue clearColor {{{0.48f, 0.66f, 0.86f, 1.0f}}};
+    VkRenderPassBeginInfo renderPassInfo {};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass = renderPass_;
+    renderPassInfo.framebuffer = framebuffers_[imageIndex];
+    renderPassInfo.renderArea.extent = swapchainExtent_;
+    renderPassInfo.clearValueCount = 1;
+    renderPassInfo.pClearValues = &clearColor;
+    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    if (roadPipeline_ != VK_NULL_HANDLE && roadVertexBuffer_ != VK_NULL_HANDLE && roadIndexBuffer_ != VK_NULL_HANDLE && roadIndexCount_ > 0) {
+        const VkDeviceSize offset = 0;
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, roadPipeline_);
+        vkCmdPushConstants(commandBuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants), &push);
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &roadVertexBuffer_, &offset);
+        vkCmdBindIndexBuffer(commandBuffer, roadIndexBuffer_, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdDrawIndexed(commandBuffer, roadIndexCount_, 1, 0, 0, 0);
     }
+    vkCmdEndRenderPass(commandBuffer);
+    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) throw std::runtime_error("Failed to record command buffer");
 }
 
 void VulkanRenderer::createSyncObjects() {

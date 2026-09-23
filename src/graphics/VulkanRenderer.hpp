@@ -3,6 +3,7 @@
 #include <GLFW/glfw3.h>
 #include <cstdint>
 #include <filesystem>
+#include <glm/vec3.hpp>
 #include <string>
 #include <vector>
 
@@ -22,6 +23,7 @@ public:
     void pollEvents() const;
     void drawFrame();
     void setRoadMesh(const map::RoadMesh& mesh);
+    void setFollowCamera(glm::vec3 vehiclePosition, float vehicleHeadingRadians);
     [[nodiscard]] GLFWwindow* window() const { return window_; }
 
 private:
@@ -43,7 +45,7 @@ private:
     [[nodiscard]] std::uint32_t findMemoryType(std::uint32_t typeFilter, VkMemoryPropertyFlags properties) const;
     [[nodiscard]] std::uint32_t findGraphicsQueueFamily() const;
     [[nodiscard]] VkShaderModule loadShaderModule(const std::filesystem::path& path) const;
-    void recordCommandBuffers();
+    void recordCommandBuffer(std::uint32_t imageIndex);
 
     GLFWwindow* window_ = nullptr;
     VkInstance instance_ = VK_NULL_HANDLE;
@@ -70,6 +72,9 @@ private:
     VkBuffer roadIndexBuffer_ = VK_NULL_HANDLE;
     VkDeviceMemory roadIndexMemory_ = VK_NULL_HANDLE;
     std::uint32_t roadIndexCount_ = 0;
+
+    glm::vec3 cameraVehiclePosition_ {0.0f, 0.35f, 0.0f};
+    float cameraVehicleHeadingRadians_ = 0.0f;
 
     VkSemaphore imageAvailableSemaphore_ = VK_NULL_HANDLE;
     VkSemaphore renderFinishedSemaphore_ = VK_NULL_HANDLE;

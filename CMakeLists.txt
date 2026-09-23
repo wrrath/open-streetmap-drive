@@ -100,4 +100,5 @@ target_compile_options(osm_drive PRIVATE
 target_compile_definitions(osm_drive PRIVATE
   OSM_DRIVE_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets"
   OSM_DRIVE_SHADER_DIR="${OSM_DRIVE_SHADER_OUTPUT_DIR}"
+  GLM_FORCE_DEPTH_ZERO_TO_ONE
 )

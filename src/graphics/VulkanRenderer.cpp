@@ -18,6 +18,40 @@ constexpr std::array<const char*, 1> DeviceExtensions {VK_KHR_SWAPCHAIN_EXTENSIO
 
 struct PushConstants { glm::mat4 mvp; };
 
+struct CarVertex {
+    glm::vec3 position;
+    glm::vec3 color;
+};
+
+// Two deliberately simple prisms form a chunky late-90s sedan silhouette.
+// Keeping this mesh procedural makes the coordinate convention (+Z forward,
+// +Y up) obvious and avoids introducing an asset loader for one small object.
+const std::array<CarVertex, 16> CarVertices {{
+    {{-1.0f, 0.0f, -2.0f}, {0.72f, 0.05f, 0.04f}},
+    {{ 1.0f, 0.0f, -2.0f}, {0.72f, 0.05f, 0.04f}},
+    {{ 1.0f, 0.0f,  2.0f}, {0.72f, 0.05f, 0.04f}},
+    {{-1.0f, 0.0f,  2.0f}, {0.72f, 0.05f, 0.04f}},
+    {{-1.0f, 0.65f, -1.8f}, {0.90f, 0.10f, 0.06f}},
+    {{ 1.0f, 0.65f, -1.8f}, {0.90f, 0.10f, 0.06f}},
+    {{ 1.0f, 0.65f,  1.7f}, {0.90f, 0.10f, 0.06f}},
+    {{-1.0f, 0.65f,  1.7f}, {0.90f, 0.10f, 0.06f}},
+    {{-0.78f, 0.65f, -0.85f}, {0.06f, 0.12f, 0.17f}},
+    {{ 0.78f, 0.65f, -0.85f}, {0.06f, 0.12f, 0.17f}},
+    {{ 0.78f, 0.65f,  1.05f}, {0.06f, 0.12f, 0.17f}},
+    {{-0.78f, 0.65f,  1.05f}, {0.06f, 0.12f, 0.17f}},
+    {{-0.58f, 1.42f, -0.55f}, {0.10f, 0.20f, 0.27f}},
+    {{ 0.58f, 1.42f, -0.55f}, {0.10f, 0.20f, 0.27f}},
+    {{ 0.58f, 1.42f,  0.68f}, {0.10f, 0.20f, 0.27f}},
+    {{-0.58f, 1.42f,  0.68f}, {0.10f, 0.20f, 0.27f}},
+}};
+
+constexpr std::array<std::uint32_t, 72> CarIndices {{
+    0,1,5, 0,5,4, 1,2,6, 1,6,5, 2,3,7, 2,7,6,
+    3,0,4, 3,4,7, 4,5,6, 4,6,7, 3,2,1, 3,1,0,
+    8,9,13, 8,13,12, 9,10,14, 9,14,13, 10,11,15, 10,15,14,
+    11,8,12, 11,12,15, 12,13,14, 12,14,15, 11,10,9, 11,9,8
+}};
+
 std::vector<char> readBinaryFile(const std::filesystem::path& path) {
     std::ifstream file(path, std::ios::ate | std::ios::binary);
     if (!file) throw std::runtime_error("Missing shader: " + path.string());
@@ -60,6 +94,7 @@ VulkanRenderer::VulkanRenderer(int width, int height, const char* title) {
     createImageViews();
     createRenderPass();
     createGraphicsPipeline();
+    createCarMeshBuffers();
     createFramebuffers();
     createCommandPool();
     createCommandBuffers();
@@ -72,11 +107,16 @@ VulkanRenderer::~VulkanRenderer() {
         if (inFlightFence_ != VK_NULL_HANDLE) vkDestroyFence(device_, inFlightFence_, nullptr);
         if (renderFinishedSemaphore_ != VK_NULL_HANDLE) vkDestroySemaphore(device_, renderFinishedSemaphore_, nullptr);
         if (imageAvailableSemaphore_ != VK_NULL_HANDLE) vkDestroySemaphore(device_, imageAvailableSemaphore_, nullptr);
+        if (carIndexBuffer_ != VK_NULL_HANDLE) vkDestroyBuffer(device_, carIndexBuffer_, nullptr);
+        if (carIndexMemory_ != VK_NULL_HANDLE) vkFreeMemory(device_, carIndexMemory_, nullptr);
+        if (carVertexBuffer_ != VK_NULL_HANDLE) vkDestroyBuffer(device_, carVertexBuffer_, nullptr);
+        if (carVertexMemory_ != VK_NULL_HANDLE) vkFreeMemory(device_, carVertexMemory_, nullptr);
         if (roadIndexBuffer_ != VK_NULL_HANDLE) vkDestroyBuffer(device_, roadIndexBuffer_, nullptr);
         if (roadIndexMemory_ != VK_NULL_HANDLE) vkFreeMemory(device_, roadIndexMemory_, nullptr);
         if (roadVertexBuffer_ != VK_NULL_HANDLE) vkDestroyBuffer(device_, roadVertexBuffer_, nullptr);
         if (roadVertexMemory_ != VK_NULL_HANDLE) vkFreeMemory(device_, roadVertexMemory_, nullptr);
         cleanupSwapchain();
+        if (carPipeline_ != VK_NULL_HANDLE) vkDestroyPipeline(device_, carPipeline_, nullptr);
         if (roadPipeline_ != VK_NULL_HANDLE) vkDestroyPipeline(device_, roadPipeline_, nullptr);
         if (pipelineLayout_ != VK_NULL_HANDLE) vkDestroyPipelineLayout(device_, pipelineLayout_, nullptr);
         if (commandPool_ != VK_NULL_HANDLE) vkDestroyCommandPool(device_, commandPool_, nullptr);
@@ -114,7 +154,7 @@ void VulkanRenderer::setRoadMesh(const map::RoadMesh& mesh) {
     core::log(core::LogLevel::Info, "Uploaded road mesh to Vulkan vertex/index buffers");
 }
 
-void VulkanRenderer::setFollowCamera(glm::vec3 vehiclePosition, float vehicleHeadingRadians) {
+void VulkanRenderer::setVehicleTransform(glm::vec3 vehiclePosition, float vehicleHeadingRadians) {
     cameraVehiclePosition_ = vehiclePosition;
     cameraVehicleHeadingRadians_ = vehicleHeadingRadians;
 }
@@ -309,8 +349,9 @@ void VulkanRenderer::createGraphicsPipeline() {
     const std::filesystem::path shaderDir = OSM_DRIVE_SHADER_DIR;
     const auto vertPath = shaderDir / "road.vert.spv";
     const auto fragPath = shaderDir / "road.frag.spv";
-    if (!std::filesystem::exists(vertPath) || !std::filesystem::exists(fragPath)) {
-        core::log(core::LogLevel::Warning, "Compiled road shaders not found; showing clear color only. Install glslc and rerun CMake to render mesh.");
+    if (!std::filesystem::exists(vertPath) || !std::filesystem::exists(fragPath) ||
+        !std::filesystem::exists(shaderDir / "car.vert.spv") || !std::filesystem::exists(shaderDir / "car.frag.spv")) {
+        core::log(core::LogLevel::Warning, "Compiled road/car shaders not found; showing clear color only. Install glslc and rerun CMake to render meshes.");
         return;
     }
 
@@ -387,8 +428,50 @@ void VulkanRenderer::createGraphicsPipeline() {
     pipelineInfo.layout = pipelineLayout_;
     pipelineInfo.renderPass = renderPass_;
     if (vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &roadPipeline_) != VK_SUCCESS) throw std::runtime_error("Failed to create road graphics pipeline");
+
+    // The car uses the same render pass and push-constant layout as roads, but
+    // has a smaller position/color vertex format and its own fragment shader.
+    VkShaderModule carVert = loadShaderModule(shaderDir / "car.vert.spv");
+    VkShaderModule carFrag = loadShaderModule(shaderDir / "car.frag.spv");
+    stages[0].module = carVert;
+    stages[1].module = carFrag;
+    binding.stride = sizeof(CarVertex);
+    std::array<VkVertexInputAttributeDescription, 2> carAttributes {};
+    carAttributes[0] = {0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(CarVertex, position)};
+    carAttributes[1] = {1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(CarVertex, color)};
+    vertexInput.vertexAttributeDescriptionCount = static_cast<std::uint32_t>(carAttributes.size());
+    vertexInput.pVertexAttributeDescriptions = carAttributes.data();
+    if (vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &carPipeline_) != VK_SUCCESS) throw std::runtime_error("Failed to create car graphics pipeline");
+
+    vkDestroyShaderModule(device_, carFrag, nullptr);
+    vkDestroyShaderModule(device_, carVert, nullptr);
     vkDestroyShaderModule(device_, frag, nullptr);
     vkDestroyShaderModule(device_, vert, nullptr);
+}
+
+void VulkanRenderer::createCarMeshBuffers() {
+    if (carPipeline_ == VK_NULL_HANDLE) return;
+    carIndexCount_ = static_cast<std::uint32_t>(CarIndices.size());
+
+    // These host-visible buffers are straightforward for this static, tiny
+    // mesh. A staging/device-local upload path can replace them for large assets.
+    const VkDeviceSize vertexBytes = sizeof(CarVertices);
+    createBuffer(vertexBytes, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 carVertexBuffer_, carVertexMemory_);
+    void* data = nullptr;
+    vkMapMemory(device_, carVertexMemory_, 0, vertexBytes, 0, &data);
+    std::memcpy(data, CarVertices.data(), sizeof(CarVertices));
+    vkUnmapMemory(device_, carVertexMemory_);
+
+    const VkDeviceSize indexBytes = sizeof(CarIndices);
+    createBuffer(indexBytes, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 carIndexBuffer_, carIndexMemory_);
+    vkMapMemory(device_, carIndexMemory_, 0, indexBytes, 0, &data);
+    std::memcpy(data, CarIndices.data(), sizeof(CarIndices));
+    vkUnmapMemory(device_, carIndexMemory_);
+    core::log(core::LogLevel::Info, "Uploaded procedural player car mesh");
 }
 
 void VulkanRenderer::createFramebuffers() {
@@ -434,7 +517,11 @@ void VulkanRenderer::recordCommandBuffer(std::uint32_t imageIndex) {
     const glm::vec3 cameraPosition = cameraVehiclePosition_ - forward * 22.0f + glm::vec3(0.0f, 10.0f, 0.0f);
     const glm::vec3 lookAt = cameraVehiclePosition_ + forward * 18.0f + glm::vec3(0.0f, 1.5f, 0.0f);
     const glm::mat4 view = glm::lookAt(cameraPosition, lookAt, glm::vec3(0.0f, 1.0f, 0.0f));
-    const PushConstants push {projection * view};
+    const glm::mat4 viewProjection = projection * view;
+    const PushConstants roadPush {viewProjection};
+    glm::mat4 carModel = glm::translate(glm::mat4(1.0f), cameraVehiclePosition_);
+    carModel = glm::rotate(carModel, cameraVehicleHeadingRadians_, glm::vec3(0.0f, 1.0f, 0.0f));
+    const PushConstants carPush {viewProjection * carModel};
 
     VkCommandBuffer commandBuffer = commandBuffers_[imageIndex];
     vkResetCommandBuffer(commandBuffer, 0);
@@ -453,10 +540,20 @@ void VulkanRenderer::recordCommandBuffer(std::uint32_t imageIndex) {
     if (roadPipeline_ != VK_NULL_HANDLE && roadVertexBuffer_ != VK_NULL_HANDLE && roadIndexBuffer_ != VK_NULL_HANDLE && roadIndexCount_ > 0) {
         const VkDeviceSize offset = 0;
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, roadPipeline_);
-        vkCmdPushConstants(commandBuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants), &push);
+        vkCmdPushConstants(commandBuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants), &roadPush);
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, &roadVertexBuffer_, &offset);
         vkCmdBindIndexBuffer(commandBuffer, roadIndexBuffer_, 0, VK_INDEX_TYPE_UINT32);
         vkCmdDrawIndexed(commandBuffer, roadIndexCount_, 1, 0, 0, 0);
+    }
+    if (carPipeline_ != VK_NULL_HANDLE && carVertexBuffer_ != VK_NULL_HANDLE && carIndexBuffer_ != VK_NULL_HANDLE) {
+        // Push constants are copied directly into the command buffer, so each
+        // object can use a different model transform without a uniform buffer.
+        const VkDeviceSize offset = 0;
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, carPipeline_);
+        vkCmdPushConstants(commandBuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants), &carPush);
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &carVertexBuffer_, &offset);
+        vkCmdBindIndexBuffer(commandBuffer, carIndexBuffer_, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdDrawIndexed(commandBuffer, carIndexCount_, 1, 0, 0, 0);
     }
     vkCmdEndRenderPass(commandBuffer);
     if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) throw std::runtime_error("Failed to record command buffer");

@@ -25,6 +25,7 @@ public:
     void setRoadMesh(const map::RoadMesh& mesh);
     void setTerrainMesh(const map::RoadMesh& mesh);
     void setFollowCamera(glm::vec3 vehiclePosition, float vehicleHeadingRadians);
+    void setVehicleTransform(glm::vec3 vehiclePosition, float vehicleHeadingRadians);
     [[nodiscard]] GLFWwindow* window() const { return window_; }
 
 private:
@@ -36,6 +37,7 @@ private:
     void createImageViews();
     void createRenderPass();
     void createGraphicsPipeline();
+    void createCarMeshBuffers();
     void createFramebuffers();
     void createCommandPool();
     void createCommandBuffers();
@@ -65,6 +67,7 @@ private:
     VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
     VkPipeline roadPipeline_ = VK_NULL_HANDLE;
     VkPipeline terrainPipeline_ = VK_NULL_HANDLE;
+    VkPipeline carPipeline_ = VK_NULL_HANDLE;
     std::vector<VkFramebuffer> framebuffers_;
     VkCommandPool commandPool_ = VK_NULL_HANDLE;
     std::vector<VkCommandBuffer> commandBuffers_;
@@ -79,6 +82,13 @@ private:
     VkBuffer terrainIndexBuffer_ = VK_NULL_HANDLE;
     VkDeviceMemory terrainIndexMemory_ = VK_NULL_HANDLE;
     std::uint32_t terrainIndexCount_ = 0;
+
+    // The car is a tiny procedural mesh with its own position/color layout.
+    VkBuffer carVertexBuffer_ = VK_NULL_HANDLE;
+    VkDeviceMemory carVertexMemory_ = VK_NULL_HANDLE;
+    VkBuffer carIndexBuffer_ = VK_NULL_HANDLE;
+    VkDeviceMemory carIndexMemory_ = VK_NULL_HANDLE;
+    std::uint32_t carIndexCount_ = 0;
 
     glm::vec3 cameraVehiclePosition_ {0.0f, 0.35f, 0.0f};
     float cameraVehicleHeadingRadians_ = 0.0f;

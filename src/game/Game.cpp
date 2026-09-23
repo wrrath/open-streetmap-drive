@@ -37,7 +37,7 @@ void Game::run() {
             accumulator -= fixedDt;
         }
 
-        renderer_.setFollowCamera(player_.position(), player_.headingRadians());
+        renderer_.setVehicleTransform(player_.position(), player_.headingRadians());
         renderer_.drawFrame();
     }
 }

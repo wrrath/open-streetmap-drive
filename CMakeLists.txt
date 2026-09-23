@@ -57,6 +57,8 @@ set(OSM_DRIVE_SHADER_SPV
   "${OSM_DRIVE_SHADER_OUTPUT_DIR}/road.vert.spv"
   "${OSM_DRIVE_SHADER_OUTPUT_DIR}/road.frag.spv"
   "${OSM_DRIVE_SHADER_OUTPUT_DIR}/terrain.frag.spv"
+  "${OSM_DRIVE_SHADER_OUTPUT_DIR}/car.vert.spv"
+  "${OSM_DRIVE_SHADER_OUTPUT_DIR}/car.frag.spv"
 )
 if(GLSLC_EXECUTABLE OR GLSLANG_VALIDATOR_EXECUTABLE)
   file(MAKE_DIRECTORY "${OSM_DRIVE_SHADER_OUTPUT_DIR}")
@@ -85,6 +87,18 @@ if(GLSLC_EXECUTABLE OR GLSLANG_VALIDATOR_EXECUTABLE)
     OUTPUT "${OSM_DRIVE_SHADER_OUTPUT_DIR}/terrain.frag.spv"
     COMMAND ${OSM_DRIVE_SHADER_COMPILER} ${OSM_DRIVE_SHADER_COMPILER_ARGS} "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/terrain.frag" -o "${OSM_DRIVE_SHADER_OUTPUT_DIR}/terrain.frag.spv"
     DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/terrain.frag"
+    VERBATIM
+  )
+  add_custom_command(
+    OUTPUT "${OSM_DRIVE_SHADER_OUTPUT_DIR}/car.vert.spv"
+    COMMAND ${OSM_DRIVE_SHADER_COMPILER} ${OSM_DRIVE_SHADER_COMPILER_ARGS} "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/car.vert" -o "${OSM_DRIVE_SHADER_OUTPUT_DIR}/car.vert.spv"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/car.vert"
+    VERBATIM
+  )
+  add_custom_command(
+    OUTPUT "${OSM_DRIVE_SHADER_OUTPUT_DIR}/car.frag.spv"
+    COMMAND ${OSM_DRIVE_SHADER_COMPILER} ${OSM_DRIVE_SHADER_COMPILER_ARGS} "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/car.frag" -o "${OSM_DRIVE_SHADER_OUTPUT_DIR}/car.frag.spv"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/car.frag"
     VERBATIM
   )
   add_custom_target(osm_drive_shaders DEPENDS ${OSM_DRIVE_SHADER_SPV})

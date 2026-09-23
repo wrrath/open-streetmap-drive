@@ -51,28 +51,38 @@ FetchContent_MakeAvailable(glfw glm tinyxml2)
 file(GLOB_RECURSE OSM_DRIVE_SOURCES CONFIGURE_DEPENDS src/*.cpp src/*.hpp)
 
 find_program(GLSLC_EXECUTABLE glslc)
+find_program(GLSLANG_VALIDATOR_EXECUTABLE glslangValidator)
 set(OSM_DRIVE_SHADER_OUTPUT_DIR "${CMAKE_BINARY_DIR}/shaders")
-if(GLSLC_EXECUTABLE)
+set(OSM_DRIVE_SHADER_SPV
+  "${OSM_DRIVE_SHADER_OUTPUT_DIR}/road.vert.spv"
+  "${OSM_DRIVE_SHADER_OUTPUT_DIR}/road.frag.spv"
+)
+if(GLSLC_EXECUTABLE OR GLSLANG_VALIDATOR_EXECUTABLE)
   file(MAKE_DIRECTORY "${OSM_DRIVE_SHADER_OUTPUT_DIR}")
-  set(OSM_DRIVE_SHADER_SPV
-    "${OSM_DRIVE_SHADER_OUTPUT_DIR}/road.vert.spv"
-    "${OSM_DRIVE_SHADER_OUTPUT_DIR}/road.frag.spv"
-  )
+
+  if(GLSLC_EXECUTABLE)
+    set(OSM_DRIVE_SHADER_COMPILER ${GLSLC_EXECUTABLE})
+    set(OSM_DRIVE_SHADER_COMPILER_ARGS)
+  else()
+    set(OSM_DRIVE_SHADER_COMPILER ${GLSLANG_VALIDATOR_EXECUTABLE})
+    set(OSM_DRIVE_SHADER_COMPILER_ARGS -V)
+  endif()
+
   add_custom_command(
     OUTPUT "${OSM_DRIVE_SHADER_OUTPUT_DIR}/road.vert.spv"
-    COMMAND ${GLSLC_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/road.vert" -o "${OSM_DRIVE_SHADER_OUTPUT_DIR}/road.vert.spv"
+    COMMAND ${OSM_DRIVE_SHADER_COMPILER} ${OSM_DRIVE_SHADER_COMPILER_ARGS} "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/road.vert" -o "${OSM_DRIVE_SHADER_OUTPUT_DIR}/road.vert.spv"
     DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/road.vert"
     VERBATIM
   )
   add_custom_command(
     OUTPUT "${OSM_DRIVE_SHADER_OUTPUT_DIR}/road.frag.spv"
-    COMMAND ${GLSLC_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/road.frag" -o "${OSM_DRIVE_SHADER_OUTPUT_DIR}/road.frag.spv"
+    COMMAND ${OSM_DRIVE_SHADER_COMPILER} ${OSM_DRIVE_SHADER_COMPILER_ARGS} "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/road.frag" -o "${OSM_DRIVE_SHADER_OUTPUT_DIR}/road.frag.spv"
     DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/road.frag"
     VERBATIM
   )
   add_custom_target(osm_drive_shaders DEPENDS ${OSM_DRIVE_SHADER_SPV})
 else()
-  message(WARNING "glslc not found; building without compiled road shaders. Install glslang-tools or Vulkan SDK shader tools for mesh rendering.")
+  message(WARNING "No GLSL-to-SPIR-V compiler found; building without compiled road shaders. Install glslc, glslang-tools, or Vulkan SDK shader tools for mesh rendering.")
 endif()
 
 add_executable(osm_drive ${OSM_DRIVE_SOURCES})

@@ -27,7 +27,7 @@ This repository provides a clean C++20/Vulkan foundation:
 - CMake 3.22+
 - C++20 compiler
 - Vulkan SDK (`VULKAN_SDK` configured)
-- `glslc` for road mesh shaders (`sudo apt install glslang-tools` on Ubuntu/WSL)
+- `glslc` or `glslangValidator` for road mesh shaders (`sudo apt install glslc` or `sudo apt install glslang-tools` on Ubuntu/WSL)
 - Linux packages commonly needed: `libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev`
 
 ## Build

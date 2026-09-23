@@ -1,6 +1,7 @@
 #pragma once
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -24,6 +25,16 @@ private:
     void createSurface();
     void pickPhysicalDevice();
     void createDevice();
+    void createSwapchain();
+    void createImageViews();
+    void createRenderPass();
+    void createFramebuffers();
+    void createCommandPool();
+    void createCommandBuffers();
+    void createSyncObjects();
+    void cleanupSwapchain();
+
+    [[nodiscard]] std::uint32_t findGraphicsQueueFamily() const;
 
     GLFWwindow* window_ = nullptr;
     VkInstance instance_ = VK_NULL_HANDLE;
@@ -31,6 +42,21 @@ private:
     VkPhysicalDevice physicalDevice_ = VK_NULL_HANDLE;
     VkDevice device_ = VK_NULL_HANDLE;
     VkQueue graphicsQueue_ = VK_NULL_HANDLE;
+    std::uint32_t graphicsQueueFamily_ = 0;
+
+    VkSwapchainKHR swapchain_ = VK_NULL_HANDLE;
+    VkFormat swapchainImageFormat_ = VK_FORMAT_UNDEFINED;
+    VkExtent2D swapchainExtent_ {};
+    std::vector<VkImage> swapchainImages_;
+    std::vector<VkImageView> swapchainImageViews_;
+    VkRenderPass renderPass_ = VK_NULL_HANDLE;
+    std::vector<VkFramebuffer> framebuffers_;
+    VkCommandPool commandPool_ = VK_NULL_HANDLE;
+    std::vector<VkCommandBuffer> commandBuffers_;
+
+    VkSemaphore imageAvailableSemaphore_ = VK_NULL_HANDLE;
+    VkSemaphore renderFinishedSemaphore_ = VK_NULL_HANDLE;
+    VkFence inFlightFence_ = VK_NULL_HANDLE;
 };
 
 } // namespace osm_drive::graphics

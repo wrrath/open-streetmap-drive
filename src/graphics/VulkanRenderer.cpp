@@ -56,8 +56,11 @@ void addHudRect(std::vector<HudVertex>& vertices, float x, float y, float width,
     const float sy = 2.0f / static_cast<float>(extent.height);
     const float left = -1.0f + x * sx;
     const float right = -1.0f + (x + width) * sx;
-    const float top = 1.0f - y * sy;
-    const float bottom = 1.0f - (y + height) * sy;
+    // Vulkan's viewport transform maps NDC Y=-1 to the top of a normal
+    // positive-height viewport, so screen-space HUD Y grows upward in clip
+    // space from -1 rather than downward from +1.
+    const float top = -1.0f + y * sy;
+    const float bottom = -1.0f + (y + height) * sy;
     vertices.insert(vertices.end(), {{{left, top}, color}, {{left, bottom}, color}, {{right, bottom}, color},
                                      {{left, top}, color}, {{right, bottom}, color}, {{right, top}, color}});
 }
@@ -72,8 +75,8 @@ void addHudText(std::vector<HudVertex>& vertices, const std::string& text, float
             if (rows[static_cast<std::size_t>(row)][col] != '1') continue;
             const float left = -1.0f + (x + static_cast<float>(col) * pixel) * sx;
             const float right = -1.0f + (x + static_cast<float>(col + 1) * pixel - 1.0f) * sx;
-            const float top = 1.0f - (y + static_cast<float>(row) * pixel) * sy;
-            const float bottom = 1.0f - (y + static_cast<float>(row + 1) * pixel - 1.0f) * sy;
+            const float top = -1.0f + (y + static_cast<float>(row) * pixel) * sy;
+            const float bottom = -1.0f + (y + static_cast<float>(row + 1) * pixel - 1.0f) * sy;
             vertices.insert(vertices.end(), {{{left, top}, color}, {{left, bottom}, color}, {{right, bottom}, color},
                                              {{left, top}, color}, {{right, bottom}, color}, {{right, top}, color}});
         }

@@ -50,6 +50,18 @@ std::array<const char*, 7> glyph(char c) {
     }
 }
 
+void addHudRect(std::vector<HudVertex>& vertices, float x, float y, float width, float height,
+                glm::vec3 color, VkExtent2D extent) {
+    const float sx = 2.0f / static_cast<float>(extent.width);
+    const float sy = 2.0f / static_cast<float>(extent.height);
+    const float left = -1.0f + x * sx;
+    const float right = -1.0f + (x + width) * sx;
+    const float top = 1.0f - y * sy;
+    const float bottom = 1.0f - (y + height) * sy;
+    vertices.insert(vertices.end(), {{{left, top}, color}, {{left, bottom}, color}, {{right, bottom}, color},
+                                     {{left, top}, color}, {{right, bottom}, color}, {{right, top}, color}});
+}
+
 void addHudText(std::vector<HudVertex>& vertices, const std::string& text, float x, float y,
                 float pixel, glm::vec3 color, VkExtent2D extent) {
     const float sx = 2.0f / static_cast<float>(extent.width);
@@ -692,15 +704,21 @@ void VulkanRenderer::recordCommandBuffer(std::uint32_t imageIndex) {
         char text[64] {};
         const int mph = static_cast<int>(std::round(telemetry_.speedMetersPerSecond * 2.23694f));
         const int kmh = static_cast<int>(std::round(telemetry_.speedMetersPerSecond * 3.6f));
-        std::snprintf(text, sizeof(text), "SPEED %03d MPH", mph);
-        addHudText(hudVertices, text, 34.0f, 34.0f, 4.0f, {1.0f, 1.0f, 1.0f}, swapchainExtent_);
-        std::snprintf(text, sizeof(text), "%03d KMH", kmh);
-        addHudText(hudVertices, text, 178.0f, 70.0f, 3.0f, {0.72f, 0.88f, 1.0f}, swapchainExtent_);
+        // Draw a simple opaque panel first so the world cannot visually merge
+        // with the glyphs. Lines use a fixed baseline and conservative spacing
+        // to avoid overlapping on small WSLg/window framebuffers.
+        addHudRect(hudVertices, 24.0f, 24.0f, 270.0f, 150.0f, {0.02f, 0.025f, 0.03f}, swapchainExtent_);
+        addHudRect(hudVertices, 28.0f, 28.0f, 262.0f, 142.0f, {0.06f, 0.075f, 0.085f}, swapchainExtent_);
+
+        std::snprintf(text, sizeof(text), "MPH %03d", mph);
+        addHudText(hudVertices, text, 40.0f, 40.0f, 4.0f, {1.0f, 1.0f, 1.0f}, swapchainExtent_);
+        std::snprintf(text, sizeof(text), "KMH %03d", kmh);
+        addHudText(hudVertices, text, 40.0f, 78.0f, 3.5f, {0.72f, 0.88f, 1.0f}, swapchainExtent_);
         std::snprintf(text, sizeof(text), "RPM %04d", static_cast<int>(std::round(telemetry_.rpm)));
-        addHudText(hudVertices, text, 34.0f, 102.0f, 3.0f,
+        addHudText(hudVertices, text, 40.0f, 111.0f, 3.5f,
                    telemetry_.rpm > 6000.0f ? glm::vec3{1.0f, 0.25f, 0.2f} : glm::vec3{1.0f, 0.75f, 0.18f}, swapchainExtent_);
         std::snprintf(text, sizeof(text), "GEAR %d", telemetry_.gear);
-        addHudText(hudVertices, text, 34.0f, 132.0f, 3.0f, {0.55f, 1.0f, 0.55f}, swapchainExtent_);
+        addHudText(hudVertices, text, 40.0f, 144.0f, 3.5f, {0.55f, 1.0f, 0.55f}, swapchainExtent_);
         const VkDeviceSize bytes = sizeof(HudVertex) * hudVertices.size();
         if (bytes <= HudBufferBytes) {
             void* mapped = nullptr;

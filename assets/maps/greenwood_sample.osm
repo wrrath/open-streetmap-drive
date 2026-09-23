@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="osm-drive-sample">
+  <bounds minlat="35.2000" minlon="-94.2700" maxlat="35.2300" maxlon="-94.2300"/>
+  <node id="1" lat="35.2050" lon="-94.2620"/>
+  <node id="2" lat="35.2075" lon="-94.2580"/>
+  <node id="3" lat="35.2100" lon="-94.2540"/>
+  <node id="4" lat="35.2130" lon="-94.2500"/>
+  <node id="5" lat="35.2160" lon="-94.2460"/>
+  <node id="6" lat="35.2190" lon="-94.2420"/>
+  <node id="7" lat="35.2110" lon="-94.2600"/>
+  <node id="8" lat="35.2140" lon="-94.2570"/>
+  <node id="9" lat="35.2170" lon="-94.2540"/>
+  <node id="10" lat="35.2200" lon="-94.2510"/>
+  <way id="100">
+    <nd ref="1"/><nd ref="2"/><nd ref="3"/><nd ref="4"/><nd ref="5"/><nd ref="6"/>
+    <tag k="highway" v="secondary"/>
+    <tag k="name" v="Greenwood Rural Run"/>
+    <tag k="maxspeed" v="45 mph"/>
+  </way>
+  <way id="101">
+    <nd ref="3"/><nd ref="7"/><nd ref="8"/><nd ref="9"/><nd ref="10"/>
+    <tag k="highway" v="residential"/>
+    <tag k="name" v="County Connector"/>
+  </way>
+</osm>

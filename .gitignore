@@ -1,0 +1,12 @@
+build/
+.vscode/
+.cache/
+*.user
+*.o
+*.a
+*.so
+*.dll
+*.exe
+.DS_Store
+assets/maps/*.osm
+!assets/maps/greenwood_sample.osm

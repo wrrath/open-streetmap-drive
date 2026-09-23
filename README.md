@@ -52,12 +52,12 @@ A tiny sample map is included at `assets/maps/greenwood_sample.osm`. For a large
 ./build/osm_drive assets/maps/greenwood.osm
 ```
 
-## Roadmap
+## Documentation
 
-See:
-
-- [`docs/ROADMAP.md`](docs/ROADMAP.md)
-- [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md)
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — module boundaries and end-to-end data flow.
+- [`docs/VULKAN_OVERVIEW.md`](docs/VULKAN_OVERVIEW.md) — beginner-friendly Vulkan setup and frame flow.
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — planned features.
+- [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md) — milestone plan.
 
 ## License notes
 

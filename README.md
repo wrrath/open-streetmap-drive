@@ -15,6 +15,7 @@ This repository provides a clean C++20/Vulkan foundation:
 
 - GLFW window and Vulkan instance/device/swapchain setup.
 - Road mesh upload to Vulkan vertex/index buffers and rendering through a simple graphics pipeline when `glslc` is available at CMake configure time.
+- Procedural terrain grid with grass/soil materials and a data-source interface for future elevation and land-cover rasters.
 - Game loop with fixed timestep physics.
 - OSM XML loader for highways around Greenwood, AR.
 - Coordinate conversion from latitude/longitude to local meters.
@@ -61,7 +62,9 @@ in [`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md).
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — planned features.
 - [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md) — milestone plan.
 
-## License notes
+## Data and license notes
+
+See [`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md) for intended USGS 3DEP elevation and Annual NLCD land-cover sources, metadata requirements, and links. The current terrain is generated in code and adds no external asset license.
 
 - OpenStreetMap data is © OpenStreetMap contributors and licensed under the
   [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/). See

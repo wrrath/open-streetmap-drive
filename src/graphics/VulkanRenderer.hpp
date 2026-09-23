@@ -23,6 +23,7 @@ public:
     void pollEvents() const;
     void drawFrame();
     void setRoadMesh(const map::RoadMesh& mesh);
+    void setTerrainMesh(const map::RoadMesh& mesh);
     void setFollowCamera(glm::vec3 vehiclePosition, float vehicleHeadingRadians);
     [[nodiscard]] GLFWwindow* window() const { return window_; }
 
@@ -63,6 +64,7 @@ private:
     VkRenderPass renderPass_ = VK_NULL_HANDLE;
     VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
     VkPipeline roadPipeline_ = VK_NULL_HANDLE;
+    VkPipeline terrainPipeline_ = VK_NULL_HANDLE;
     std::vector<VkFramebuffer> framebuffers_;
     VkCommandPool commandPool_ = VK_NULL_HANDLE;
     std::vector<VkCommandBuffer> commandBuffers_;
@@ -72,6 +74,11 @@ private:
     VkBuffer roadIndexBuffer_ = VK_NULL_HANDLE;
     VkDeviceMemory roadIndexMemory_ = VK_NULL_HANDLE;
     std::uint32_t roadIndexCount_ = 0;
+    VkBuffer terrainVertexBuffer_ = VK_NULL_HANDLE;
+    VkDeviceMemory terrainVertexMemory_ = VK_NULL_HANDLE;
+    VkBuffer terrainIndexBuffer_ = VK_NULL_HANDLE;
+    VkDeviceMemory terrainIndexMemory_ = VK_NULL_HANDLE;
+    std::uint32_t terrainIndexCount_ = 0;
 
     glm::vec3 cameraVehiclePosition_ {0.0f, 0.35f, 0.0f};
     float cameraVehicleHeadingRadians_ = 0.0f;

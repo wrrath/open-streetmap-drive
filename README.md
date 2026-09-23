@@ -54,7 +54,10 @@ A tiny sample map is included at `assets/maps/greenwood_sample.osm`. For a large
 
 ## Roadmap
 
-See [`docs/ROADMAP.md`](docs/ROADMAP.md).
+See:
+
+- [`docs/ROADMAP.md`](docs/ROADMAP.md)
+- [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md)
 
 ## License notes
 
